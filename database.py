@@ -6,7 +6,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
+# Get database URL from environment or fallback to SQLite
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Fallback to SQLite if DATABASE_URL is not set or empty
+if not SQLALCHEMY_DATABASE_URL:
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
+
+# SQLAlchemy 1.4+ requires 'postgresql://' instead of 'postgres://'
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Handle SQLite specific arguments
 connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}

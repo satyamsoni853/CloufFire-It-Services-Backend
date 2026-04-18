@@ -6,6 +6,15 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Fallback or check
+if not DATABASE_URL:
+    print("DATABASE_URL not found. Skipping migration.")
+    exit(0)
+
+# SQLAlchemy/psycopg2 1.4+ requires 'postgresql://' instead of 'postgres://'
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 def update_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
