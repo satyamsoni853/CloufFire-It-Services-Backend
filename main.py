@@ -236,26 +236,36 @@ async def get_all_users(current_user: User = Depends(get_current_user), db: Sess
 
 @app.post("/signup")
 async def signup(user_data: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user_data.email).first()
+    normalized_email = user_data.email.strip().lower()
+    normalized_mobile = user_data.mobile.strip()
+    normalized_full_name = user_data.full_name.strip()
+
+    db_user = db.query(User).filter(User.email.ilike(normalized_email)).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(
+            status_code=400,
+            detail="This email already exists. Please log in or use a different email.",
+        )
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
     hashed_pwd = get_password_hash(user_data.password)
     pending_data = {
-        "full_name": user_data.full_name,
-        "email": user_data.email,
-        "mobile": user_data.mobile,
-        "work_status": user_data.work_status,
+        "full_name": normalized_full_name,
+        "email": normalized_email,
+        "mobile": normalized_mobile,
+        "work_status": user_data.work_status.strip(),
         "role": user_data.role,
         "hashed_password": hashed_pwd,
         "otp": otp
     }
     pending_token = create_pending_token(pending_data)
     try:
-        await send_otp_email(user_data.email, otp)
+        await send_otp_email(normalized_email, otp)
         return {"message": "OTP sent to your email.", "pending_token": pending_token}
-    except Exception as e:
-        return {"message": "OTP generated (check terminal).", "pending_token": pending_token, "debug_otp": otp}
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to send OTP email right now. Please try again in a moment.",
+        )
 
 @app.post("/verify-otp")
 async def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):
@@ -295,8 +305,11 @@ async def forgot_password(email: EmailStr, db: Session = Depends(get_db)):
     try:
         await send_otp_email(email, otp)
         return {"message": "Password reset OTP sent to your email."}
-    except Exception as e:
-        return {"message": "OTP generated (check terminal).", "debug_otp": otp}
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to send reset OTP email right now. Please try again in a moment.",
+        )
 
 @app.post("/reset-password")
 async def reset_password(email: EmailStr, otp: str, new_password: str, db: Session = Depends(get_db)):
