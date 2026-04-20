@@ -11,7 +11,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Prefer PBKDF2 for new hashes to avoid bcrypt/passlib compatibility issues
+# seen on some deploy targets. Keep bcrypt enabled so existing passwords
+# continue to verify.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
