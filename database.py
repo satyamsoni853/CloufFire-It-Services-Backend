@@ -2,6 +2,8 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+from datetime import datetime
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,6 +48,20 @@ class User(Base):
     resume_url = Column(String, nullable=True)
     profile_image_url = Column(String, nullable=True)
     bio = Column(String, nullable=True)
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    company = Column(String)
+    location = Column(String)
+    salary = Column(String)
+    type = Column(String) # Full-time, Contract, etc.
+    description = Column(String, nullable=True)
+    posted_by_id = Column(Integer) # User ID of the employer
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 def get_db():
     db = SessionLocal()

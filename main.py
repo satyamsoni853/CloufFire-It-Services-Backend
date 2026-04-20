@@ -9,7 +9,8 @@ import uuid
 import os
 import random
 from datetime import datetime, timedelta
-from database import get_db, User
+from database import get_db, User, Job
+
 from mail_utils import send_otp_email
 from auth import get_password_hash, verify_password, create_access_token, create_pending_token, verify_pending_token, SECRET_KEY, ALGORITHM
 from jose import jwt, JWTError
@@ -91,6 +92,15 @@ class UserProfile(BaseModel):
     bio: Optional[str] = None
     resume_url: Optional[str] = None
     profile_image_url: Optional[str] = None
+
+class JobCreate(BaseModel):
+    title: str
+    company: str
+    location: str
+    salary: str
+    type: str
+    description: Optional[str] = None
+
 
 # Routes
 @app.get("/")
@@ -188,6 +198,29 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user), db
             "total_employers": len(employers),
             "total_jobseekers": len(jobseekers),
         }
+
+@app.get("/jobs")
+async def get_jobs(db: Session = Depends(get_db)):
+    return db.query(Job).all()
+
+@app.post("/jobs")
+async def post_job(job_data: JobCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["employer", "admin"]:
+        raise HTTPException(status_code=403, detail="Only employers and admins can post jobs")
+    new_job = Job(
+        title=job_data.title,
+        company=job_data.company,
+        location=job_data.location,
+        salary=job_data.salary,
+        type=job_data.type,
+        description=job_data.description,
+        posted_by_id=current_user.id
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+    return new_job
+
 
 @app.get("/employer/jobseekers")
 async def get_all_jobseekers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

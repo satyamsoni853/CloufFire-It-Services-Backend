@@ -88,7 +88,47 @@ test_users = [
         "education": "MS Computer Science - Stanford",
         "experience": "12 years in tech leadership",
     },
+    {
+        "full_name": "Test Seeker",
+        "email": "seeker@example.com",
+        "mobile": "9876543210",
+        "role": "jobseeker",
+        "work_status": "fresher",
+        "hashed_password": get_password_hash("TestPass@123"),
+        "is_active": True,
+        "bio": "A passionate job seeker looking for opportunities.",
+        "skills": "React, JavaScript, HTML, CSS",
+        "education": "B.Sc Computer Science",
+        "experience": "Fresher",
+    },
+    {
+        "full_name": "Test Employer",
+        "email": "employer@example.com",
+        "mobile": "9876543211",
+        "role": "employer",
+        "work_status": "employed",
+        "hashed_password": get_password_hash("TestPass@123"),
+        "is_active": True,
+        "bio": "Looking for the best talent in the industry.",
+        "skills": "Hiring, Management",
+        "education": "MBA",
+        "experience": "5 years in HR",
+    },
+    {
+        "full_name": "Test Admin",
+        "email": "admin@example.com",
+        "mobile": "9876543212",
+        "role": "admin",
+        "work_status": "employed",
+        "hashed_password": get_password_hash("TestPass@123"),
+        "is_active": True,
+        "bio": "Platform admin.",
+        "skills": "Admin, Security",
+        "education": "B.Tech",
+        "experience": "8 years in IT Admin",
+    },
 ]
+
 
 inserted = 0
 skipped = 0
