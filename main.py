@@ -324,13 +324,31 @@ async def reset_password(email: EmailStr, otp: str, new_password: str, db: Sessi
 
 @app.post("/login", response_model=Token)
 async def login(user_data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == user_data.email).first()
-    if not user or not verify_password(user_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.is_active:
-        raise HTTPException(status_code=401, detail="Please verify your email first")
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer", "role": user.role}
+    try:
+        # Normalize email to match signup logic
+        normalized_email = user_data.email.strip().lower()
+        user = db.query(User).filter(User.email == normalized_email).first()
+        
+        if not user or not verify_password(user_data.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        if not user.is_active:
+            raise HTTPException(status_code=401, detail="Please verify your email first")
+        
+        # Ensure role is a string (fallback to jobseeker if None)
+        user_role = str(user.role) if user.role else "jobseeker"
+        
+        access_token = create_access_token(data={"sub": user.email, "role": user_role})
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer", 
+            "role": user_role
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

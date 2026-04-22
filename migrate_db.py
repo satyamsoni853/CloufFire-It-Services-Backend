@@ -20,18 +20,41 @@ def update_db():
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         
-        print("Adding 'profile_image_url' column...")
-        try:
-            cur.execute("ALTER TABLE users ADD COLUMN profile_image_url TEXT;")
-            print("Added column: profile_image_url")
-        except psycopg2.errors.DuplicateColumn:
-            conn.rollback()
-            print("Column profile_image_url already exists.")
-        except Exception as e:
-            conn.rollback()
-            print(f"Error adding column: {e}")
+        # List of columns to check/add
+        columns_to_add = [
+            ("role", "TEXT DEFAULT 'jobseeker'"),
+            ("is_active", "BOOLEAN DEFAULT FALSE"),
+            ("otp", "TEXT"),
+            ("otp_expiry", "TIMESTAMP"),
+            ("education", "TEXT"),
+            ("experience", "TEXT"),
+            ("skills", "TEXT"),
+            ("resume_url", "TEXT"),
+            ("profile_image_url", "TEXT"),
+            ("bio", "TEXT"),
+            ("work_status", "TEXT"),
+            ("mobile", "TEXT")
+        ]
         
+        for col_name, col_type in columns_to_add:
+            print(f"Checking column '{col_name}'...")
+            try:
+                cur.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type};")
+                print(f"  Added column: {col_name}")
+                conn.commit()
+            except psycopg2.errors.DuplicateColumn:
+                conn.rollback()
+                print(f"  Column {col_name} already exists.")
+            except Exception as e:
+                conn.rollback()
+                print(f"  Error adding column {col_name}: {e}")
+        
+        # Ensure all existing users have a role if it was just added
+        print("Updating existing users to have a default role...")
+        cur.execute("UPDATE users SET role = 'jobseeker' WHERE role IS NULL;")
+        cur.execute("UPDATE users SET is_active = TRUE WHERE is_active IS NULL;")
         conn.commit()
+        
         cur.close()
         conn.close()
         print("Database update complete.")
