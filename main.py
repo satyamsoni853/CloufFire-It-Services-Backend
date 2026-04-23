@@ -199,6 +199,78 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user), db
             "total_jobseekers": len(jobseekers),
         }
 
+@app.get("/notifications")
+async def get_notifications(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    role = current_user.role
+    notifications = []
+    
+    # Global notification
+    notifications.append({
+        "id": "welcome",
+        "title": f"Welcome back, {current_user.full_name.split(' ')[0]}!",
+        "time": "Just now",
+        "icon": "👋",
+        "priority": "low"
+    })
+    
+    if role == "admin":
+        total_users = db.query(User).count()
+        active_users = db.query(User).filter(User.is_active == True).count()
+        notifications.append({
+            "id": "stats_users",
+            "title": f"Platform has {total_users} registered users",
+            "time": "Updated now",
+            "icon": "📊",
+            "priority": "medium"
+        })
+        if total_users > active_users:
+            notifications.append({
+                "id": "pending_users",
+                "title": f"{total_users - active_users} users are pending verification",
+                "time": "Action required",
+                "icon": "⏳",
+                "priority": "high"
+            })
+            
+    elif role == "employer":
+        jobseekers_count = db.query(User).filter(User.role == "jobseeker").count()
+        resume_count = db.query(User).filter(User.role == "jobseeker", User.resume_url != None).count()
+        notifications.append({
+            "id": "talent_pool",
+            "title": f"{jobseekers_count} candidates are available in the talent pool",
+            "time": "1 hour ago",
+            "icon": "👥",
+            "priority": "medium"
+        })
+        if resume_count > 0:
+            notifications.append({
+                "id": "resumes",
+                "title": f"{resume_count} candidates have uploaded their resumes",
+                "time": "Check them out",
+                "icon": "📄",
+                "priority": "medium"
+            })
+            
+    else: # jobseeker
+        jobs_count = db.query(Job).count()
+        employers_count = db.query(User).filter(User.role == "employer").count()
+        notifications.append({
+            "id": "jobs_count",
+            "title": f"{jobs_count} active job openings found for you",
+            "time": "Recently added",
+            "icon": "💼",
+            "priority": "high"
+        })
+        notifications.append({
+            "id": "employer_count",
+            "title": f"{employers_count} employers are currently hiring",
+            "time": "Trending",
+            "icon": "🏢",
+            "priority": "medium"
+        })
+        
+    return notifications
+
 @app.get("/jobs")
 async def get_jobs(db: Session = Depends(get_db)):
     return db.query(Job).all()
