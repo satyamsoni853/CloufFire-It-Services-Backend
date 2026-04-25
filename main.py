@@ -11,7 +11,7 @@ import random
 from datetime import datetime, timedelta
 from database import get_db, User, Job
 
-from mail_utils import send_otp_email
+from mail_utils import send_otp_email, send_notification_email
 from auth import get_password_hash, verify_password, create_access_token, create_pending_token, verify_pending_token, SECRET_KEY, ALGORITHM
 from jose import jwt, JWTError
 
@@ -96,10 +96,79 @@ class UserProfile(BaseModel):
 class JobCreate(BaseModel):
     title: str
     company: str
-    location: str
-    salary: str
-    type: str
     description: Optional[str] = None
+    location: str
+    type: str
+    experience_required: Optional[str] = None
+    skills_required: Optional[str] = None
+    openings: Optional[int] = None
+    salary: str
+    perks: Optional[str] = None
+    education_qualification: Optional[str] = None
+    preferred_skills: Optional[str] = None
+    certifications: Optional[str] = None
+    deadline: Optional[str] = None
+    application_method: Optional[str] = None
+    application_email: Optional[str] = None
+    application_link: Optional[str] = None
+    hr_name: Optional[str] = None
+    hr_phone: Optional[str] = None
+    company_description: Optional[str] = None
+    company_website: Optional[str] = None
+    company_logo_url: Optional[str] = None
+    work_mode: Optional[str] = None
+    shift_timing: Optional[str] = None
+    notice_period: Optional[str] = None
+    gender_preference: Optional[str] = None
+    industry_type: Optional[str] = None
+    department: Optional[str] = None
+
+class ContactSeeker(BaseModel):
+    seeker_email: str
+    message: str
+
+class ApplyJob(BaseModel):
+    job_id: int
+    cover_letter: Optional[str] = None
+
+class SavedJobCreate(BaseModel):
+    job_id: int
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+class JobUpdate(BaseModel):
+    title: Optional[str] = None
+    company: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    type: Optional[str] = None
+    experience_required: Optional[str] = None
+    skills_required: Optional[str] = None
+    openings: Optional[int] = None
+    salary: Optional[str] = None
+    perks: Optional[str] = None
+    education_qualification: Optional[str] = None
+    preferred_skills: Optional[str] = None
+    certifications: Optional[str] = None
+    deadline: Optional[str] = None
+    application_method: Optional[str] = None
+    application_email: Optional[str] = None
+    application_link: Optional[str] = None
+    hr_name: Optional[str] = None
+    hr_phone: Optional[str] = None
+    company_description: Optional[str] = None
+    company_website: Optional[str] = None
+    company_logo_url: Optional[str] = None
+    work_mode: Optional[str] = None
+    shift_timing: Optional[str] = None
+    notice_period: Optional[str] = None
+    gender_preference: Optional[str] = None
+    industry_type: Optional[str] = None
+    department: Optional[str] = None
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 
 # Routes
@@ -129,6 +198,11 @@ async def update_profile(profile_data: ProfileUpdate, current_user: User = Depen
         setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
+    await send_notification_email(
+        current_user.email,
+        "Profile Updated",
+        f"Hello {current_user.full_name}, your profile has been successfully updated on Cloudfire IT Services."
+    )
     return {"message": "Profile updated successfully"}
 
 @app.post("/upload-resume")
@@ -139,7 +213,7 @@ async def upload_resume(file: UploadFile = File(...), current_user: User = Depen
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    current_user.resume_url = f"http://localhost:8000/{file_path}"
+    current_user.resume_url = f"{BASE_URL}/{file_path}"
     db.commit()
     return {"url": current_user.resume_url}
 
@@ -151,7 +225,7 @@ async def upload_image(file: UploadFile = File(...), current_user: User = Depend
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    current_user.profile_image_url = f"http://localhost:8000/{file_path}"
+    current_user.profile_image_url = f"{BASE_URL}/{file_path}"
     db.commit()
     return {"url": current_user.profile_image_url}
 
@@ -273,26 +347,256 @@ async def get_notifications(current_user: User = Depends(get_current_user), db: 
 
 @app.get("/jobs")
 async def get_jobs(db: Session = Depends(get_db)):
-    return db.query(Job).all()
+    try:
+        jobs = db.query(Job).all()
+        return jobs
+    except Exception as e:
+        print(f"Error fetching jobs: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.post("/jobs")
 async def post_job(job_data: JobCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.role not in ["employer", "admin"]:
         raise HTTPException(status_code=403, detail="Only employers and admins can post jobs")
     new_job = Job(
-        title=job_data.title,
-        company=job_data.company,
-        location=job_data.location,
-        salary=job_data.salary,
-        type=job_data.type,
-        description=job_data.description,
+        **job_data.model_dump(),
         posted_by_id=current_user.id
     )
     db.add(new_job)
     db.commit()
     db.refresh(new_job)
+    
+    await send_notification_email(
+        current_user.email,
+        "Job Posted Successfully",
+        f"Hello {current_user.full_name}, you have successfully posted a new job: {new_job.title} at {new_job.company}."
+    )
+    
     return new_job
 
+@app.delete("/jobs/{job_id}")
+async def delete_job(job_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["employer", "admin"]:
+        raise HTTPException(status_code=403, detail="Only employers and admins can delete jobs")
+    
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Employers can only delete their own jobs, admins can delete any
+    if current_user.role == "employer" and job.posted_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete jobs you posted")
+    
+    job_title = job.title
+    db.delete(job)
+    db.commit()
+    
+    await send_notification_email(
+        current_user.email,
+        "Job Removed",
+        f"Hello {current_user.full_name}, the job '{job_title}' has been successfully removed."
+    )
+    
+    return {"message": "Job deleted successfully"}
+
+@app.put("/jobs/{job_id}")
+async def update_job(job_id: int, job_data: JobUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["employer", "admin"]:
+        raise HTTPException(status_code=403, detail="Only employers and admins can edit jobs")
+    
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    if current_user.role == "employer" and job.posted_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit jobs you posted")
+        
+    for field, value in job_data.model_dump(exclude_unset=True).items():
+        setattr(job, field, value)
+        
+    db.commit()
+    db.refresh(job)
+    return job
+
+@app.get("/employer/jobs")
+async def get_employer_jobs(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "employer":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    jobs = db.query(Job).filter(Job.posted_by_id == current_user.id).all()
+    from database import Application
+    
+    result = []
+    for job in jobs:
+        app_count = db.query(Application).filter(Application.job_id == job.id).count()
+        job_dict = job.__dict__.copy()
+        job_dict["application_count"] = app_count
+        result.append(job_dict)
+        
+    return result
+
+@app.delete("/admin/users/{user_id}")
+async def delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_email = user.email
+    user_name = user.full_name
+    db.delete(user)
+    db.commit()
+    
+    await send_notification_email(
+        current_user.email, # Notify admin
+        "User Account Removed",
+        f"Admin, you have successfully removed the user account for {user_name} ({user_email})."
+    )
+    
+    return {"message": "User deleted successfully"}
+
+@app.delete("/account")
+async def delete_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.delete(current_user)
+    db.commit()
+    return {"message": "Account deleted successfully"}
+
+@app.put("/change-password")
+async def change_password(data: ChangePassword, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    
+    current_user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@app.post("/contact-seeker")
+async def contact_seeker(data: ContactSeeker, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["employer", "admin"]:
+        raise HTTPException(status_code=403, detail="Only employers can contact seekers")
+    
+    seeker = db.query(User).filter(User.email == data.seeker_email).first()
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Job seeker not found")
+    
+    # Send email to seeker
+    await send_notification_email(
+        seeker.email,
+        f"New message from {current_user.full_name} via Cloudfire",
+        f"Hello {seeker.full_name},<br><br>{current_user.full_name} ({current_user.email}) from Cloudfire wants to connect with you.<br><br><strong>Message:</strong><br>{data.message}<br><br>You can reply directly to this employer at: <strong>{current_user.email}</strong>"
+    )
+    # Notify employer too
+    await send_notification_email(
+        current_user.email,
+        "Contact Request Sent",
+        f"Hello {current_user.full_name}, your message has been sent to {seeker.full_name} ({seeker.email}) successfully."
+    )
+    
+    return {"message": f"Message sent to {seeker.full_name} successfully"}
+
+@app.post("/apply-job")
+async def apply_to_job(data: ApplyJob, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "jobseeker":
+        raise HTTPException(status_code=403, detail="Only job seekers can apply to jobs")
+    
+    job = db.query(Job).filter(Job.id == data.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Find the employer who posted the job
+    employer = db.query(User).filter(User.id == job.posted_by_id).first()
+    employer_email = employer.email if employer else None
+    
+    # Build resume info
+    resume_info = f"<br><strong>Resume:</strong> <a href='{current_user.resume_url}'>View Resume</a>" if current_user.resume_url else "<br><em>No resume uploaded</em>"
+    cover = f"<br><br><strong>Cover Letter:</strong><br>{data.cover_letter}" if data.cover_letter else ""
+    
+    # Email the employer
+    if employer_email:
+        await send_notification_email(
+            employer_email,
+            f"New Application for {job.title}",
+            f"Hello,<br><br><strong>{current_user.full_name}</strong> ({current_user.email}) has applied for the position of <strong>{job.title}</strong> at <strong>{job.company}</strong>.{resume_info}{cover}<br><br>Contact the applicant at: <strong>{current_user.email}</strong> | Phone: <strong>{current_user.mobile or 'N/A'}</strong>"
+        )
+    
+    # Confirm to jobseeker
+    await send_notification_email(
+        current_user.email,
+        f"Application Submitted: {job.title}",
+        f"Hello {current_user.full_name}, you have successfully applied for the position of <strong>{job.title}</strong> at <strong>{job.company}</strong>. The employer will review your application and contact you if interested."
+    )
+    
+    from database import Application
+    new_app = Application(
+        user_id=current_user.id,
+        job_id=job.id,
+        cover_letter=data.cover_letter,
+        status="Applied"
+    )
+    db.add(new_app)
+    db.commit()
+    
+    return {"message": f"Successfully applied for {job.title} at {job.company}"}
+
+@app.get("/applications")
+async def get_applications(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "jobseeker":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    from database import Application
+    apps = db.query(Application).filter(Application.user_id == current_user.id).all()
+    result = []
+    for app_ in apps:
+        job = db.query(Job).filter(Job.id == app_.job_id).first()
+        if job:
+            app_dict = app_.__dict__.copy()
+            app_dict["job_title"] = job.title
+            app_dict["company"] = job.company
+            app_dict["location"] = job.location
+            result.append(app_dict)
+    return result
+
+@app.post("/saved-jobs")
+async def save_job(data: SavedJobCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "jobseeker":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    from database import SavedJob
+    existing = db.query(SavedJob).filter(SavedJob.user_id == current_user.id, SavedJob.job_id == data.job_id).first()
+    if existing:
+        return {"message": "Job already saved"}
+    
+    new_saved = SavedJob(user_id=current_user.id, job_id=data.job_id)
+    db.add(new_saved)
+    db.commit()
+    return {"message": "Job saved successfully"}
+
+@app.get("/saved-jobs")
+async def get_saved_jobs(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "jobseeker":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    from database import SavedJob
+    saved = db.query(SavedJob).filter(SavedJob.user_id == current_user.id).all()
+    result = []
+    for s in saved:
+        job = db.query(Job).filter(Job.id == s.job_id).first()
+        if job:
+            result.append(job)
+    return result
+
+@app.delete("/saved-jobs/{job_id}")
+async def remove_saved_job(job_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "jobseeker":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    from database import SavedJob
+    saved = db.query(SavedJob).filter(SavedJob.user_id == current_user.id, SavedJob.job_id == job_id).first()
+    if saved:
+        db.delete(saved)
+        db.commit()
+    return {"message": "Saved job removed"}
 
 @app.get("/employer/jobseekers")
 async def get_all_jobseekers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -362,6 +666,13 @@ async def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    await send_notification_email(
+        new_user.email,
+        "Welcome to Cloudfire IT Services",
+        f"Hello {new_user.full_name}, your account has been successfully verified and created. Welcome to our platform!"
+    )
+    
     access_token = create_access_token(data={"sub": new_user.email, "role": new_user.role})
     return {"message": "Account created!", "access_token": access_token, "token_type": "bearer", "role": new_user.role}
 

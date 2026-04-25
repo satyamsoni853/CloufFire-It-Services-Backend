@@ -57,3 +57,40 @@ def _send_email_sync(email: str, otp: str) -> None:
 
 async def send_otp_email(email: str, otp: str):
     await asyncio.to_thread(_send_email_sync, email, otp)
+
+
+def _send_notification_sync(email: str, subject: str, body: str) -> None:
+    if not SMTP_USER or not SMTP_PASSWORD or not SMTP_SERVER:
+        return  # Or log warning
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = SMTP_USER
+    message["To"] = email
+    
+    html = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f9f9f9; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h2 style="color: #ff7301; margin: 0;">Cloudfire IT Services</h2>
+                    <p style="color: #666; font-size: 14px;">Notification</p>
+                </div>
+                <p>Hello,</p>
+                <p>{body}</p>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="font-size: 11px; color: #bbb; text-align: center;">&copy; 2026 Cloudfire IT Services. All rights reserved.</p>
+            </div>
+        </body>
+    </html>
+    """
+    message.attach(MIMEText(html, "html"))
+
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, [email], message.as_string())
+
+
+async def send_notification_email(email: str, subject: str, body: str):
+    await asyncio.to_thread(_send_notification_sync, email, subject, body)
