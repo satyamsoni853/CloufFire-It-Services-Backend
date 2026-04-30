@@ -33,7 +33,14 @@ def update_db():
             ("profile_image_url", "TEXT"),
             ("bio", "TEXT"),
             ("work_status", "TEXT"),
-            ("mobile", "TEXT")
+            ("mobile", "TEXT"),
+            ("location", "TEXT"),
+            ("salary", "TEXT"),
+            ("projects", "TEXT"),
+            ("summary", "TEXT"),
+            ("gender", "TEXT"),
+            ("dob", "TEXT"),
+            ("languages", "TEXT")
         ]
         
         for col_name, col_type in columns_to_add:

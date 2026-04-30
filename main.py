@@ -42,6 +42,18 @@ async def log_requests(request: Request, call_next):
 
 
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print(f"Validation error: {exc.errors()}")
+    print(f"Request body: {await request.body()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(await request.body())},
+    )
+
 # Authentication Dependency
 async def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = request.headers.get("Authorization")
