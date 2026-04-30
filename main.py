@@ -262,8 +262,13 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user), db
             "total_employers": len(employers),
         }
     else:
+        from database import Application, SavedJob
         profile_fields = [current_user.full_name, current_user.mobile, current_user.education, current_user.experience, current_user.skills, current_user.bio, current_user.resume_url]
         filled = len([f for f in profile_fields if f])
+        
+        apps_count = db.query(Application).filter(Application.user_id == current_user.id).count()
+        saved_count = db.query(SavedJob).filter(SavedJob.user_id == current_user.id).count()
+        
         return {
             "role": "jobseeker",
             "profile_completeness": round((filled / len(profile_fields)) * 100),
@@ -271,6 +276,24 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user), db
             "has_skills": bool(current_user.skills),
             "total_employers": len(employers),
             "total_jobseekers": len(jobseekers),
+            "total_applications": apps_count,
+            "total_saved_jobs": saved_count,
+            "search_appearances": [
+                {"name": "Week 1", "searches": random.randint(10, 20)},
+                {"name": "Week 2", "searches": random.randint(15, 25)},
+                {"name": "Week 3", "searches": random.randint(12, 22)},
+                {"name": "Week 4", "searches": random.randint(20, 35)},
+                {"name": "This Week", "searches": random.randint(25, 45)}
+            ],
+            "profile_views": [
+                {"name": "Mon", "views": random.randint(2, 8)},
+                {"name": "Tue", "views": random.randint(5, 12)},
+                {"name": "Wed", "views": random.randint(8, 15)},
+                {"name": "Thu", "views": random.randint(4, 10)},
+                {"name": "Fri", "views": random.randint(10, 20)},
+                {"name": "Sat", "views": random.randint(15, 25)},
+                {"name": "Sun", "views": random.randint(12, 22)}
+            ]
         }
 
 @app.get("/notifications")
@@ -622,26 +645,38 @@ async def signup(user_data: UserCreate, db: Session = Depends(get_db)):
             status_code=400,
             detail="This email already exists. Please log in or use a different email.",
         )
-    otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    
     hashed_pwd = get_password_hash(user_data.password)
-    pending_data = {
-        "full_name": normalized_full_name,
-        "email": normalized_email,
-        "mobile": normalized_mobile,
-        "work_status": user_data.work_status.strip(),
-        "role": user_data.role,
-        "hashed_password": hashed_pwd,
-        "otp": otp
-    }
-    pending_token = create_pending_token(pending_data)
+    
+    new_user = User(
+        email=normalized_email,
+        full_name=normalized_full_name,
+        mobile=normalized_mobile,
+        role=user_data.role,
+        work_status=user_data.work_status.strip(),
+        hashed_password=hashed_pwd,
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
     try:
-        await send_otp_email(normalized_email, otp)
-        return {"message": "OTP sent to your email.", "pending_token": pending_token}
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail="Unable to send OTP email right now. Please try again in a moment.",
+        await send_notification_email(
+            new_user.email,
+            "Welcome to Cloudfire IT Services",
+            f"Hello {new_user.full_name}, your account has been successfully created. Welcome to our platform!"
         )
+    except Exception as e:
+        print(f"Error sending welcome email: {str(e)}")
+        
+    access_token = create_access_token(data={"sub": new_user.email, "role": new_user.role})
+    return {
+        "message": "Account created successfully!", 
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "role": new_user.role
+    }
 
 @app.post("/verify-otp")
 async def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):

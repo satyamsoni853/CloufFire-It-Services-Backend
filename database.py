@@ -48,6 +48,13 @@ class User(Base):
     resume_url = Column(String, nullable=True)
     profile_image_url = Column(String, nullable=True)
     bio = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    salary = Column(String, nullable=True)
+    projects = Column(String, nullable=True)
+    summary = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
+    dob = Column(String, nullable=True)
+    languages = Column(String, nullable=True)
 
 class Job(Base):
     __tablename__ = "jobs"
