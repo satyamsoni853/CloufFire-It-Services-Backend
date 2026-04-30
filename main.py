@@ -26,6 +26,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"Request: {request.method} {request.url}")
+    try:
+        response = await call_next(request)
+        print(f"Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"Unhandled error during request: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+
 
 
 # Authentication Dependency
@@ -770,4 +784,8 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    # In production, we don't want reload=True
+    is_dev = os.environ.get("ENV", "production").lower() == "development"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=is_dev)
