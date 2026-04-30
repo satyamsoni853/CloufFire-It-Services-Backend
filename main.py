@@ -202,6 +202,10 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 async def root():
     return {"status": "ok", "message": "Cloudfire IT Services API is running"}
 
+@app.get("/health")
+async def health_check():
+    return {"status": "alive", "timestamp": datetime.utcnow()}
+
 @app.get("/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
     return {
