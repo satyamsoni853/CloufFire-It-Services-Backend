@@ -25,7 +25,6 @@ connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswit
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
     connect_args=connect_args,
-    pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
     pool_recycle=3600
@@ -51,17 +50,23 @@ class User(Base):
     # Job Seeker Profile Fields
     education = Column(String, nullable=True)
     experience = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=False) # For employers
     skills = Column(String, nullable=True)
     resume_url = Column(String, nullable=True)
     profile_image_url = Column(String, nullable=True)
     bio = Column(String, nullable=True)
     location = Column(String, nullable=True)
     salary = Column(String, nullable=True)
+    availability = Column(String, default="Immediate") # Immediate, 15 Days, 30 Days
+    is_featured = Column(Boolean, default=False) # For Profile Boost
+    boost_expiry = Column(DateTime, nullable=True)
     projects = Column(String, nullable=True)
     summary = Column(String, nullable=True)
     gender = Column(String, nullable=True)
     dob = Column(String, nullable=True)
     languages = Column(String, nullable=True)
+    is_profile_public = Column(Boolean, default=True)
+    search_status = Column(String, default="Actively Looking") # Actively Looking, Open to Offers, Not Looking
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -109,6 +114,7 @@ class Job(Base):
     
     posted_by_id = Column(Integer)  # User ID of the employer
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_approved = Column(Boolean, default=True) # Default true for now, can be changed to false for moderation
 
 class SavedJob(Base):
     __tablename__ = "saved_jobs"
@@ -129,6 +135,70 @@ class Application(Base):
     applied_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, index=True)
+    receiver_id = Column(Integer, index=True)
+    message = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    is_read = Column(Boolean, default=False)
+
+class Interview(Base):
+    __tablename__ = "interviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, index=True)
+    seeker_id = Column(Integer, index=True)
+    employer_id = Column(Integer, index=True)
+    title = Column(String)
+    description = Column(String, nullable=True)
+    scheduled_at = Column(DateTime)
+    duration_minutes = Column(Integer, default=30)
+    meeting_link = Column(String, nullable=True)
+    status = Column(String, default="Scheduled") # Scheduled, Completed, Cancelled
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    title = Column(String)
+    message = Column(String)
+    type = Column(String) # application, interview, message, alert
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class JobAlert(Base):
+    __tablename__ = "job_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    keyword = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    min_salary = Column(String, nullable=True)
+    frequency = Column(String, default="Daily") # Daily, Weekly
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, index=True)
+    action = Column(String)
+    target_id = Column(Integer, nullable=True)
+    target_type = Column(String, nullable=True) # user, job, setting
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    details = Column(String, nullable=True)
+
+class SiteSetting(Base):
+    __tablename__ = "site_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True)
+    value = Column(String)
+    type = Column(String, default="text") # text, image, boolean
 
 def get_db():
     db = SessionLocal()
@@ -137,4 +207,5 @@ def get_db():
     finally:
         db.close()
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine) # Moved to main.py startup event
+

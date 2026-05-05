@@ -40,7 +40,13 @@ def update_db():
             ("summary", "TEXT"),
             ("gender", "TEXT"),
             ("dob", "TEXT"),
-            ("languages", "TEXT")
+            ("languages", "TEXT"),
+            ("is_verified", "BOOLEAN DEFAULT FALSE"),
+            ("availability", "VARCHAR DEFAULT 'Immediate'"),
+            ("is_featured", "BOOLEAN DEFAULT FALSE"),
+            ("boost_expiry", "TIMESTAMP"),
+            ("is_profile_public", "BOOLEAN DEFAULT TRUE"),
+            ("search_status", "VARCHAR DEFAULT 'Actively Looking'")
         ]
         
         for col_name, col_type in columns_to_add:

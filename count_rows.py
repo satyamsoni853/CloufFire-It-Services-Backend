@@ -1,0 +1,13 @@
+from database import SessionLocal, User, Job, Application, Interview
+print("Connecting to DB...")
+db = SessionLocal()
+print("Connected. Counting users...")
+print(f"Users: {db.query(User).count()}")
+print("Counting jobs...")
+print(f"Jobs: {db.query(Job).count()}")
+print("Counting applications...")
+print(f"Applications: {db.query(Application).count()}")
+print("Counting interviews...")
+print(f"Interviews: {db.query(Interview).count()}")
+print("Done.")
+db.close()

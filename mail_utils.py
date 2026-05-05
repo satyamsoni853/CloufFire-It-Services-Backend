@@ -94,3 +94,10 @@ def _send_notification_sync(email: str, subject: str, body: str) -> None:
 
 async def send_notification_email(email: str, subject: str, body: str):
     await asyncio.to_thread(_send_notification_sync, email, subject, body)
+
+async def send_sms_notification(mobile: str, message: str):
+    # Mock SMS Implementation
+    # In a real app, integrate with Twilio or Vonage
+    print(f"DEBUG: Sending SMS to {mobile}: {message}")
+    await asyncio.sleep(0.1) # Simulate network delay
+    return True
