@@ -447,6 +447,11 @@ def _employer_daily_activity(jobs: List[Job], applications: List[Application]):
 async def get_dashboard_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     role = current_user.role
     
+    employers = db.query(User).filter(User.role == "employer").all()
+    jobseekers = db.query(User).filter(User.role == "jobseeker").all()
+    all_applications = db.query(Application).all()
+    all_interviews = db.query(Interview).all()
+    
     if role == "admin":
         total_users = db.query(func.count(User.id)).scalar()
         total_jobseekers = db.query(func.count(User.id)).filter(User.role == "jobseeker").scalar()
@@ -479,8 +484,6 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user), db
         # Charts data (these still use lists for now, but could be optimized further)
         all_users = db.query(User).all()
         all_jobs = db.query(Job).all()
-        all_applications = db.query(Application).all()
-        all_interviews = db.query(Interview).all()
 
         return {
             "role": "admin",
